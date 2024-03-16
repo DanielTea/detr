@@ -24,6 +24,7 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
 
     '''
     func_name = "plot_utils.py::plot_logs"
+    print("test")
 
     # verify logs is a list of Paths (list[Paths]) or single Pathlib object Path,
     # convert single Path to list to avoid 'not iterable' error
@@ -56,18 +57,28 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
 
     for df, color in zip(dfs, sns.color_palette(n_colors=len(logs))):
         for j, field in enumerate(fields):
+            print(field)
             if field == 'mAP':
-                coco_eval = pd.DataFrame(
-                    np.stack(df.test_coco_eval_bbox.dropna().values)[:, 1]
-                ).ewm(com=ewm_col).mean()
-                axs[j].plot(coco_eval, c=color)
+                # Special handling for 'mAP', unpacking values from 'test_coco_eval_bbox'
+                try:
+                    coco_eval = pd.DataFrame(np.stack(df['test_coco_eval_bbox'].dropna().values)[:, 1].astype(float)).ewm(com=ewm_col).mean()
+                    axs[j].plot(coco_eval, color=color)
+                except Exception as e:
+                    print(f"Error processing field '{field}': {e}")
             else:
-                df.interpolate().ewm(com=ewm_col).mean().plot(
-                    y=[f'train_{field}', f'test_{field}'],
-                    ax=axs[j],
-                    color=[color] * 2,
-                    style=['-', '--']
-                )
+                # Assuming similar unpacking is required for 'train_{field}'
+                try:
+                    # Ensure there's a column for 'train_{field}' and it contains iterable data for unpacking
+                    if f'train_{field}' in df.columns and all(df[f'train_{field}'].apply(lambda x: isinstance(x, (list, np.ndarray)))):
+                        train_eval = pd.DataFrame(np.stack(df[f'train_{field}'].dropna().values)[:, 1].astype(float)).ewm(com=ewm_col).mean()
+                        axs[j].plot(train_eval, color=color)
+                    else:
+                        print(f"No unpacking data available for 'train_{field}', or data type is not iterable.")
+                except Exception as e:
+                    print(f"Error processing field ")
+
+
+    
     for ax, field in zip(axs, fields):
         ax.legend([Path(p).name for p in logs])
         ax.set_title(field)
